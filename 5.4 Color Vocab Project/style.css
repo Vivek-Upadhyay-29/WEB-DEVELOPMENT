@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 h2{
     font-weight: bolder;
 }
@@ -35,4 +36,43 @@ img{
  
     height: 200px;
     width: 200px;
+=======
+h2{
+    font-weight: bolder;
+}
+
+h1{
+
+    font-weight: bolder;
+}
+
+
+*{
+    font-weight: normal;
+}
+
+#red{
+    color: red;
+}
+
+#blue{
+    color: blue;
+}
+
+#orange{
+    color: orange;
+}
+#green{
+    color: green;
+}
+
+#yellow{
+    color: yellow;
+}
+
+img{
+ 
+    height: 200px;
+    width: 200px;
+>>>>>>> 351d729f5e8a917012069002c6ea5ddf6467b591
 }
