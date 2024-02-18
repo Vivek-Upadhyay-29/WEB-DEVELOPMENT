@@ -1,0 +1,31 @@
+{
+	"folders": [
+		{
+			"name": "WEB DEVELOPMENT",
+			"path": ".."
+		},
+		{
+			"name": "7.0 CSS Cascade",
+			"path": "../7.0 CSS Cascade"
+		},
+		{
+			"path": "../../udemy/7.2+CSS+Positioning/7.2 CSS Positioning"
+		},
+		{
+			"path": "../7.3 CSS Flag Project"
+		}
+	],
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "WEB DEVELOPMENT"
+	},
+	"launch": {
+		"configurations": [
+			{
+				"type": "chrome",
+				"name": "http://127.0.0.1:3000/news/index.html",
+				"request": "launch",
+				"url": "http://127.0.0.1:3000/news/index.html"
+			}
+		]
+	}
+}
