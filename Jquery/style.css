@@ -1,0 +1,11 @@
+.has-class{
+    font: 4rem sans-serif;
+  color: whitesmoke;
+display: inline-block;
+  background-color: chocolate;
+}
+
+.margin{
+    margin: 40px;
+    padding: 10px;
+}
