@@ -15,6 +15,8 @@ $("input").keypress(function(event){
   
  
     
-})
+});
 
-$
+$("h1").on("click",function(){
+    $("h1").fadeOut();
+});
