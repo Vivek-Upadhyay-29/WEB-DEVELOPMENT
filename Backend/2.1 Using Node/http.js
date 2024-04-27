@@ -9,9 +9,13 @@ const server = http.createServer((req,res)=>{
         res.end('<h1> My name is Gopal Upadhyay viveks dad  </h1>');
     }
 
-    else if(req.url == 'indo'){
-    req.end('<h1> This is about page by vivek </h1>');
+    else if(req.url == '/about'){
+    res.end('<h1> This is about page by vivek </h1>');
+}
+else{
+    res.statusCode = 404;
+   res.end('<h1>Error is found brother!!!</h1>');
 }
 
 })  
-server.listen(8080)
+server.listen(7080)
