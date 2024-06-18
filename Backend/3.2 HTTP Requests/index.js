@@ -21,7 +21,7 @@ import fs from "fs";
 import express from "express";
 const app = express();
 const port = 3000;
-
+const db = require("./db/db")
 const index = fs.readFileSync('index.html','utf-8');
 
 app.get("/",(req,res)=>{
