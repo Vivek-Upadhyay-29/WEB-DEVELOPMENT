@@ -9,5 +9,8 @@
     "start": "node server.js"
   },
   "author": "vivek",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.19.2"
+  }
 }
