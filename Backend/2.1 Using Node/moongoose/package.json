@@ -1,0 +1,19 @@
+{
+  "name": "moongoose",
+  "version": "1.0.0",
+  "description": "",
+  "main": "script.js",
+  "scripts": {
+    "dev": "nodemonStart script.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "mongoose": "^8.4.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}
