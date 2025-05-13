@@ -1,9 +1,8 @@
-Here's your complete updated BallMovementScript.cs with the fix applied so that all cloned balls shoot in the same direction as the main ball:
-
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 
 public class BallMovementScript : MonoBehaviour
 {
@@ -12,7 +11,6 @@ public class BallMovementScript : MonoBehaviour
     [SerializeField] private bool isIdle;
     [SerializeField] private Vector2 newStartPos;
     [SerializeField] private Vector2 endPos;
-
     public float sliderValue;
     public Slider slider;
     public bool isMoving;
@@ -41,12 +39,14 @@ public class BallMovementScript : MonoBehaviour
     {
         Application.targetFrameRate = 120;
         Screen.orientation = ScreenOrientation.Portrait;
+
         line = GetComponent<LineRenderer>();
         sprite = GetComponent<SpriteRenderer>();
         rb = GetComponent<Rigidbody2D>();
         startPos = transform.position;
         line.enabled = false;
         _isCloned = false;
+
         AudioMangerScript.Instance.BackgroundMusic(AudioType.BACKGROUND);
     }
 
@@ -62,28 +62,35 @@ public class BallMovementScript : MonoBehaviour
             }
         }
 
-        // Slider rotation (always active)
         sliderValue = slider.value;
         transform.rotation = Quaternion.Euler(0, 0, -sliderValue * 80);
 
-        // Mouse input (Editor/Desktop)
         if (Input.GetMouseButton(0))
         {
-            RayCheck();
+            if (!EventSystem.current.IsPointerOverGameObject())
+            {
+                RayCheck();
+            }
         }
 
         if (Input.GetMouseButtonUp(0) && !isMoving && sliderValue != 0 && !anyBallActive)
         {
-            StartCoroutine(Shootball());
-            isMoving = true;
-            canForceDownBall = false;
-            rb.AddForce(transform.up * speed, ForceMode2D.Impulse);
+            if (!EventSystem.current.IsPointerOverGameObject())
+            {
+                StartCoroutine(Shootball());
+                isMoving = true;
+                canForceDownBall = false;
+                rb.AddForce(transform.up * speed, ForceMode2D.Impulse);
+            }
         }
 
-        // Touch input (Mobile)
         if (Input.touchCount > 0)
         {
-            HandleTouchInput(anyBallActive);
+            Touch touch = Input.GetTouch(0);
+            if (!EventSystem.current.IsPointerOverGameObject(touch.fingerId))
+            {
+                HandleTouchInput(anyBallActive);
+            }
         }
         else if (!Input.GetMouseButton(0))
         {
@@ -106,6 +113,7 @@ public class BallMovementScript : MonoBehaviour
         if (!isMoving && sliderValue != 0 && !anyBallActive)
         {
             line.enabled = true;
+
             ray = Physics2D.Raycast(transform.position, transform.up, 20f, layermask);
             Vector2 reflectPos = Vector2.Reflect(ray.point - (Vector2)transform.position, ray.normal);
 
@@ -167,8 +175,6 @@ public class BallMovementScript : MonoBehaviour
     IEnumerator Shootball()
     {
         Vector2 shootPosition = transform.position;
-        Vector2 shootDirection = transform.up.normalized; // Store rotation direction once
-
         yield return new WaitForSeconds(0.1f);
 
         for (int i = 0; i < _ballcount; i++)
@@ -182,9 +188,8 @@ public class BallMovementScript : MonoBehaviour
 
                 Rigidbody2D ballRb = ball.GetComponent<Rigidbody2D>();
                 ballRb.velocity = Vector2.zero;
-                ballRb.AddForce(shootDirection * speed, ForceMode2D.Impulse); // Use stored direction
+                ballRb.AddForce(transform.up * speed, ForceMode2D.Impulse);
             }
-
             yield return new WaitForSeconds(0.1f);
         }
     }
@@ -225,15 +230,3 @@ public class BallMovementScript : MonoBehaviour
         }
     }
 }
-
-
----
-
-Let me know if you’d like:
-
-Each ball to rotate/spin while flying,
-
-A trail renderer effect for clones,
-
-Or a UI counter for the total number of balls.
-
