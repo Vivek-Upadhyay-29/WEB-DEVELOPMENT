@@ -1,18 +1,288 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Super Hero</title>
-    <link rel="stylesheet" href="./style.css">
-    <link rel="icon" href="./spideylogo.jpg" type="image/x-icon"> 
-</head>
-<body>
-    <h1>Friendly Neighbourhood Spiderman!!</h1>
-    <script>
-  
+Okay, I understand! You want to modify the ball trajectory in your "Bricks Breaker Quest" game, specifically aiming for a behavior where the ball's path is clearly visualized before shooting, including reflections off walls. You've already implemented a dotted line for aiming, and you have a LineRenderer to show the initial path and the first reflection.
+Based on your existing script and the desired outcome, here's a refined approach for the RayCheck and HandleTouchInput functions to achieve a more accurate and visually informative trajectory prediction:
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
 
-    </script>
-    
-</body>
-</html>
+public class BallMovementScript : MonoBehaviour
+{
+    [SerializeField] private Rigidbody2D rb;
+    [SerializeField] private float speed = 1;
+    [SerializeField] private bool isIdle;
+    [SerializeField] private Vector2 newStartPos;
+    [SerializeField] private Vector2 endPos;
+    public float sliderValue;
+    public Slider slider;
+    public bool isMoving;
+
+    [Header("Raycast")]
+    [SerializeField] private LayerMask layermask;
+    [SerializeField] private float angle;
+    [SerializeField] private Vector2 minMaxAngle;
+
+    [Header("LineRenderer")]
+    [SerializeField] private LineRenderer line;
+    [SerializeField] private int maxLineSegments = 5; // Limit the number of reflection lines
+    [SerializeField] private float raycastDistance = 20f;
+
+    [Header("Ball Prefab")]
+    [SerializeField] private SpriteRenderer sprite;
+    public List<GameObject> ballClone;
+    public bool _isCloned;
+    public int _ballcount = 1;
+    public int presentBallCount;
+    public bool canForceDownBall = true;
+    public Vector2 startPos;
+
+    [Header("Dotted Line Aiming")]
+    public GameObject dotPrefab;
+    public int numberOfDots = 20;
+    public float dotSpacing = 0.3f;
+    private List<GameObject> dots = new List<GameObject>();
+
+    void Start()
+    {
+        Application.targetFrameRate = 120;
+        Screen.orientation = ScreenOrientation.Portrait;
+        line = GetComponent<LineRenderer>();
+        sprite = GetComponent<SpriteRenderer>();
+        rb = GetComponent<Rigidbody2D>();
+        startPos = transform.position;
+        line.enabled = false;
+        _isCloned = false;
+        AudioMangerScript.Instance.BackgroundMusic(AudioType.BACKGROUND);
+    }
+
+    void Update()
+    {
+        bool anyBallActive = false;
+        foreach (GameObject ball in ObjectPool.Instance.pooledObjects)
+        {
+            if (ball.activeInHierarchy)
+            {
+                anyBallActive = true;
+                break;
+            }
+        }
+
+        // Slider aiming (always active)
+        sliderValue = slider.value;
+        transform.rotation = Quaternion.Euler(0, 0, -sliderValue * 80);
+
+        // Mouse aiming
+        if (Input.GetMouseButton(0))
+        {
+            UpdateAimTrajectory();
+        }
+        if (Input.GetMouseButtonUp(0) && !isMoving && sliderValue != 0 && !anyBallActive)
+        {
+            StartCoroutine(Shootball());
+            isMoving = true;
+            canForceDownBall = false;
+            rb.AddForce(transform.up * speed, ForceMode2D.Impulse);
+            ClearDots();
+            line.enabled = false; // Disable line after shooting
+        }
+
+        // Touch input aiming
+        if (Input.touchCount > 0)
+        {
+            HandleTouchInput(anyBallActive);
+        }
+        else if (!Input.GetMouseButton(0))
+        {
+            line.enabled = false;
+            ClearDots();
+        }
+    }
+
+    public void UpdateAimTrajectory()
+    {
+        bool anyBallActive = false;
+        foreach (GameObject ball in ObjectPool.Instance.pooledObjects)
+        {
+            if (ball.activeInHierarchy)
+            {
+                anyBallActive = true;
+                break;
+            }
+        }
+
+        if (!isMoving && sliderValue != 0 && !anyBallActive)
+        {
+            line.enabled = true;
+            List<Vector3> linePoints = new List<Vector3>();
+            Vector2 currentPosition = transform.position;
+            Vector2 currentDirection = transform.up;
+            linePoints.Add(currentPosition);
+
+            for (int i = 0; i < maxLineSegments; i++)
+            {
+                RaycastHit2D hit = Physics2D.Raycast(currentPosition, currentDirection, raycastDistance, layermask);
+
+                if (hit.collider != null)
+                {
+                    linePoints.Add(hit.point);
+                    currentDirection = Vector2.Reflect(currentDirection, hit.normal);
+                    currentPosition = hit.point;
+
+                    // Stop if we hit the ground (you might need to adjust the tag)
+                    if (hit.collider.CompareTag("ground"))
+                    {
+                        break;
+                    }
+                }
+                else
+                {
+                    // If no hit, extend the line in the current direction
+                    linePoints.Add(currentPosition + currentDirection * raycastDistance);
+                    break;
+                }
+            }
+
+            line.positionCount = linePoints.Count;
+            line.SetPositions(linePoints.ToArray());
+            CreateDottedLine(transform.position, transform.up); // Keep showing the initial dotted line
+        }
+        else
+        {
+            line.enabled = false;
+            ClearDots();
+        }
+    }
+
+    private void HandleTouchInput(bool anyBallActive)
+    {
+        Touch touch = Input.GetTouch(0);
+        Vector3 touchWorldPos = Camera.main.ScreenToWorldPoint(touch.position);
+        Vector2 direction = (Vector2)touchWorldPos - (Vector2)transform.position;
+        direction.Normalize();
+        angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
+
+        if (angle >= minMaxAngle.x && angle <= minMaxAngle.y)
+        {
+            transform.rotation = Quaternion.AngleAxis(angle, Vector3.forward);
+            UpdateAimTrajectory(); // Use the same trajectory update for touch
+            CreateDottedLine(transform.position, transform.up);
+
+            if (touch.phase == TouchPhase.Ended && !isMoving && !anyBallActive)
+            {
+                StartCoroutine(Shootball());
+                isMoving = true;
+                canForceDownBall = false;
+                rb.AddForce(transform.up * speed, ForceMode2D.Impulse);
+                ClearDots();
+                line.enabled = false; // Disable line after shooting
+            }
+        }
+        else
+        {
+            line.enabled = false;
+            ClearDots();
+        }
+    }
+
+    IEnumerator Shootball()
+    {
+        Vector2 shootPosition = transform.position;
+        yield return new WaitForSeconds(0.1f);
+        for (int i = 0; i < _ballcount; i++)
+        {
+            GameObject ball = ObjectPool.Instance.GetPooledObject();
+            if (ball != null)
+            {
+                ball.transform.position = shootPosition;
+                ball.SetActive(true);
+                ballClone.Add(ball);
+                Rigidbody2D ballRb = ball.GetComponent<Rigidbody2D>();
+                ballRb.velocity = Vector2.zero;
+                ballRb.AddForce(transform.up * speed, ForceMode2D.Impulse);
+            }
+            yield return new WaitForSeconds(0.1f);
+        }
+    }
+
+    void CreateDottedLine(Vector2 start, Vector2 direction)
+    {
+        ClearDots();
+        for (int i = 0; i < numberOfDots; i++)
+        {
+            Vector2 pos = start + direction.normalized * dotSpacing * i;
+            GameObject dot = Instantiate(dotPrefab, pos, Quaternion.identity);
+            dots.Add(dot);
+        }
+    }
+
+    void ClearDots()
+    {
+        foreach (GameObject dot in dots)
+        {
+            Destroy(dot);
+        }
+        dots.Clear();
+    }
+
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (collision.gameObject.CompareTag("WallCollider"))
+        {
+            AudioMangerScript.Instance.PlayOneShot(AudioType.WALLHIT);
+        }
+        if (collision.gameObject.CompareTag("ground"))
+        {
+            newStartPos = transform.position;
+            rb.velocity = Vector2.zero;
+            slider.value = 0;
+            transform.position = new Vector2(newStartPos.x, newStartPos.y);
+            isMoving = false;
+            canForceDownBall = true;
+            line.transform.position = transform.position;
+            foreach (var balls in ballClone)
+            {
+                presentBallCount++;
+            }
+            Debug.Log("Position Reset");
+            Debug.Log("Ball Count Present: " + presentBallCount);
+        }
+    }
+
+    private void OnTriggerEnter2D(Collider2D collision)
+    {
+        if (collision.gameObject.CompareTag("Multiplier"))
+        {
+            _ballcount++;
+            Debug.Log("Ball Count: " + _ballcount);
+        }
+    }
+}
+
+Key Changes and Explanation:
+ * UpdateAimTrajectory() Function:
+   * This new function encapsulates the logic for calculating and displaying the ball's trajectory. It's called in both Update (for mouse input) and HandleTouchInput.
+   * It initializes a List<Vector3> to store the points of the trajectory line.
+   * It starts with the current position and the shooting direction (transform.up).
+   * It iterates up to maxLineSegments (you can adjust this value). In each iteration:
+     * It performs a Raycast2D to check for collisions with the layermask.
+     * If a collider is hit:
+       * The hit point is added to the linePoints.
+       * The currentDirection is reflected using Vector2.Reflect.
+       * The currentPosition is updated to the hit point to start the next raycast from there.
+       * Ground Detection: I've added a check for a "ground" tag. If the raycast hits the ground, the loop breaks, preventing further reflections in the prediction. Make sure you have a GameObject tagged as "ground" representing the bottom boundary.
+     * If no collider is hit within the raycastDistance, the line extends in the current direction, and the loop breaks.
+   * Finally, it sets the positionCount and positions of the LineRenderer based on the calculated linePoints.
+   * The CreateDottedLine is still called to show the initial shooting direction.
+ * Calling UpdateAimTrajectory():
+   * In the Update function, UpdateAimTrajectory() is called when the left mouse button is held down (Input.GetMouseButton(0)).
+   * In the HandleTouchInput function, UpdateAimTrajectory() is also called when a touch is detected within the valid angle range.
+ * maxLineSegments and raycastDistance:
+   * I've introduced maxLineSegments to limit the number of predicted reflections, preventing the line from becoming too long and computationally expensive. Adjust this value as needed.
+   * raycastDistance controls how far the raycast looks for collisions in each segment.
+ * Disabling LineRenderer After Shooting:
+   * In both Shootball coroutine calls within the input handling functions, line.enabled = false; is added after shooting to hide the trajectory line.
+To use this updated script:
+ * Replace your existing BallMovementScript with this new version.
+ * Ensure that the GameObjects representing the walls and the bottom boundary (where the balls reset) have appropriate Tags assigned (e.g., "WallCollider" for walls and "ground" for the bottom). You might need to create the "ground" tag in the Unity editor if it doesn't exist.
+ * Adjust the maxLineSegments and raycastDistance values in the Inspector to fine-tune the trajectory prediction's length and accuracy.
+With these changes, you should see a LineRenderer that predicts the ball's path, including reflections off the walls, until it hits the "ground" or reaches the maximum number of segments. The dotted line will still show the initial shooting direction.
+       
