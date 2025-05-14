@@ -11,6 +11,7 @@ public class BallMovementScript : MonoBehaviour
     [SerializeField] private bool isIdle;
     [SerializeField] private Vector2 newStartPos;
     [SerializeField] private Vector2 endPos;
+
     public float sliderValue;
     public Slider slider;
     public bool isMoving;
@@ -36,9 +37,6 @@ public class BallMovementScript : MonoBehaviour
     public bool canForceDownBall = true;
     public Vector2 startPos;
 
-    private GraphicRaycaster raycaster;
-    private EventSystem eventSystem;
-
     void Start()
     {
         Application.targetFrameRate = 120;
@@ -50,10 +48,6 @@ public class BallMovementScript : MonoBehaviour
         line.enabled = false;
         _isCloned = false;
         AudioMangerScript.Instance.BackgroundMusic(AudioType.BACKGROUND);
-
-        // Setup UI raycaster
-        raycaster = FindObjectOfType<GraphicRaycaster>();
-        eventSystem = EventSystem.current;
     }
 
     void Update()
@@ -71,20 +65,26 @@ public class BallMovementScript : MonoBehaviour
         sliderValue = slider.value;
         transform.rotation = Quaternion.Euler(0, 0, -sliderValue * 80);
 
+        // Always allow aiming when dragging mouse
         if (Input.GetMouseButton(0))
         {
             RayCheck();
         }
 
+        // Only shoot when releasing mouse and not over UI
         if (Input.GetMouseButtonUp(0) && !isMoving && sliderValue != 0 && !anyBallActive)
         {
-            StartCoroutine(Shootball());
-            isMoving = true;
-            canForceDownBall = false;
-            rb.AddForce(transform.up * speed, ForceMode2D.Impulse);
+            if (!EventSystem.current.IsPointerOverGameObject())
+            {
+                StartCoroutine(Shootball());
+                isMoving = true;
+                canForceDownBall = false;
+                rb.AddForce(transform.up * speed, ForceMode2D.Impulse);
+            }
         }
 
-        if (Input.touchCount > 0)
+        // Touch input
+        if (Input.touchCount > 0 && !anyBallActive)
         {
             HandleTouchInput(anyBallActive);
         }
@@ -111,11 +111,13 @@ public class BallMovementScript : MonoBehaviour
             line.enabled = true;
             ray = Physics2D.Raycast(transform.position, transform.up, 20f, layermask);
             Vector2 reflectPos = Vector2.Reflect(ray.point - (Vector2)transform.position, ray.normal);
+
             if (useRay)
             {
                 Debug.DrawRay(transform.position, transform.up * ray.distance, Color.red);
                 Debug.DrawRay(ray.point, reflectPos.normalized * 2f, Color.green);
             }
+
             if (useLine)
             {
                 line.positionCount = 3;
@@ -142,6 +144,7 @@ public class BallMovementScript : MonoBehaviour
         if (angle >= minMaxAngle.x && angle <= minMaxAngle.y)
         {
             transform.rotation = Quaternion.AngleAxis(angle, Vector3.forward);
+
             ray = Physics2D.Raycast(transform.position, transform.up, 20f, layermask);
             Vector2 reflectPos = Vector2.Reflect(ray.point - (Vector2)transform.position, ray.normal);
 
@@ -154,28 +157,17 @@ public class BallMovementScript : MonoBehaviour
                 line.SetPosition(2, ray.point + reflectPos.normalized * 2f);
             }
 
-            if (touch.phase == TouchPhase.Ended && !isMoving && !anyBallActive && !IsTouchingUIElement(touch))
+            if (touch.phase == TouchPhase.Ended && !isMoving && !anyBallActive)
             {
-                StartCoroutine(Shootball());
-                isMoving = true;
-                canForceDownBall = false;
-                rb.AddForce(transform.up * speed, ForceMode2D.Impulse);
+                if (!EventSystem.current.IsPointerOverGameObject(touch.fingerId))
+                {
+                    StartCoroutine(Shootball());
+                    isMoving = true;
+                    canForceDownBall = false;
+                    rb.AddForce(transform.up * speed, ForceMode2D.Impulse);
+                }
             }
         }
-    }
-
-    private bool IsTouchingUIElement(Touch touch)
-    {
-        if (raycaster == null || eventSystem == null)
-            return false;
-
-        PointerEventData pointerData = new PointerEventData(eventSystem);
-        pointerData.position = touch.position;
-
-        List<RaycastResult> results = new List<RaycastResult>();
-        raycaster.Raycast(pointerData, results);
-
-        return results.Count > 0;
     }
 
     IEnumerator Shootball()
@@ -193,10 +185,12 @@ public class BallMovementScript : MonoBehaviour
                 ball.transform.position = shootPosition;
                 ball.SetActive(true);
                 ballClone.Add(ball);
+
                 Rigidbody2D ballRb = ball.GetComponent<Rigidbody2D>();
                 ballRb.velocity = Vector2.zero;
                 ballRb.AddForce(shootDirection * speed, ForceMode2D.Impulse);
             }
+
             yield return new WaitForSeconds(0.1f);
         }
     }
@@ -207,6 +201,7 @@ public class BallMovementScript : MonoBehaviour
         {
             AudioMangerScript.Instance.PlayOneShot(AudioType.WALLHIT);
         }
+
         if (collision.gameObject.CompareTag("ground"))
         {
             newStartPos = transform.position;
@@ -216,10 +211,12 @@ public class BallMovementScript : MonoBehaviour
             isMoving = false;
             canForceDownBall = true;
             line.transform.position = transform.position;
+
             foreach (var balls in ballClone)
             {
                 presentBallCount++;
             }
+
             Debug.Log("Position Reset");
             Debug.Log("Ball Count Present: " + presentBallCount);
         }
