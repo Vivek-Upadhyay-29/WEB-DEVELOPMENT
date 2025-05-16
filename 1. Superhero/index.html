@@ -1,52 +1,314 @@
-Okay, let's troubleshoot why it's not working. Since you're saying it's still not preventing the ball from shooting when you touch the UI with the "MainCanvas" tag, let's go through a detailed checklist and debugging steps.
-Make sure you've done the following exactly:
- * Tagging the Canvas:
-   * Select your Canvas GameObject in the Hierarchy that contains your UI buttons (like the pause button).
-   * In the Inspector window, look at the top where the GameObject's name is. Below that, you'll see a "Tag" dropdown.
-   * Make sure you have created a tag named "MainCanvas" in the Tag Manager (Project Settings -> Tags and Layers).
-   * Select the "MainCanvas" tag from the dropdown for your Canvas GameObject.
- * Adding Physics2DRaycaster to the Camera:
-   * Select your Main Camera GameObject in the Hierarchy.
-   * In the Inspector window, click the "Add Component" button.
-   * Search for and add the Physics 2D Raycaster component.
- * Using the Correct HandleTouchInput Function:
-   * Ensure your BallMovementScript has the exact HandleTouchInput function I provided in the previous response, especially the part that uses EventSystem.current.RaycastAll and checks the hit.gameObject.CompareTag("MainCanvas"). Double-check for any typos or missing lines.
- * No Colliders on UI (with Physics2DRaycaster):
-   * If you are using the Physics2DRaycaster, you should not need to add any 2D Collider components directly to your UI elements (like the Canvas or buttons) for the raycasting to work. The Physics2DRaycaster works with the RectTransform and the rendering order of the UI elements. If you have added Colliders to your UI, try removing them temporarily to see if that resolves the issue.
-Debugging Steps:
- * Check for Errors: Look at the Unity Console for any error messages that might be related to UI or input.
- * Verify Raycast Hits: Add Debug.Log statements inside the HandleTouchInput function to see what the raycast is hitting:
-   private void HandleTouchInput(bool anyBallActive)
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
+ 
+public class BallMovementScript : MonoBehaviour
 {
-    Touch touch = Input.GetTouch(0);
-    PointerEventData eventDataCurrentPosition = new PointerEventData(EventSystem.current);
-    eventDataCurrentPosition.position = touch.position;
-    List<RaycastResult> results = new List<RaycastResult>();
-    EventSystem.current.RaycastAll(eventDataCurrentPosition, results);
-
-    if (results.Count > 0)
+    [SerializeField] private Rigidbody2D rb;
+    [SerializeField] private float speed = 1;
+    [SerializeField] private bool isIdle;
+    [SerializeField] private Vector2 newStartPos;
+    [SerializeField] private Vector2 endPos;
+    [SerializeField] private GameObject BallDownBtnUI;
+    public float sliderValue;
+    public Slider slider;
+    public bool isMoving;
+ 
+    [Header("Raycast")]
+    [SerializeField] private LayerMask layermask;
+    [SerializeField] private RaycastHit2D ray;
+    [SerializeField] private float angle;
+    [SerializeField] private Vector2 minMaxAngle;
+ 
+    [Header("LineRenderer")]
+    [SerializeField] private LineRenderer line;
+    [SerializeField] private bool useRay = true;
+    [SerializeField] private bool useLine = true;
+ 
+    [Header("Ball Prefab")]
+    [SerializeField] private SpriteRenderer sprite;
+    public List<GameObject> ballClone;
+    public bool _isCloned;
+    public int _ballcount = 1;
+    public int presentBallCount;
+    public bool canForceDownBall = true;
+    public Vector2 startPos;
+ 
+    void Start()
     {
-        Debug.Log("Raycast hit something on UI:");
-        foreach (RaycastResult hit in results)
+        Application.targetFrameRate = 120;
+        Screen.orientation = ScreenOrientation.Portrait;
+        line = GetComponent<LineRenderer>();
+        sprite = GetComponent<SpriteRenderer>();
+        rb = GetComponent<Rigidbody2D>();
+        startPos = transform.position;
+        line.enabled = false;
+        _isCloned = false;
+        AudioMangerScript.Instance.BackgroundMusic(AudioType.BACKGROUND);
+    }
+ 
+    void Update()
+    {
+        bool anyBallActive = false;
+        foreach (GameObject ball in ObjectPool.Instance.pooledObjects)
         {
-            Debug.Log($"  Hit GameObject: {hit.gameObject.name}, Tag: {hit.gameObject.tag}");
-            if (hit.gameObject.CompareTag("MainCanvas"))
+            if (ball.activeInHierarchy)
             {
-                Debug.Log("  Hit UI with MainCanvas tag, ignoring.");
-                return;
+                anyBallActive = true;
+                break;
+            }
+        }
+ 
+        sliderValue = slider.value;
+        transform.rotation = Quaternion.Euler(0, 0, -sliderValue * 80);
+ 
+        if (Input.GetMouseButton(0))
+        {
+            RayCheck();
+        }
+ 
+        if (Input.GetMouseButtonUp(0) && !isMoving && sliderValue != 0 && !anyBallActive)
+        {
+            StartCoroutine(Shootball());
+            isMoving = true;
+            canForceDownBall = false;
+            rb.AddForce(transform.up * speed, ForceMode2D.Impulse);
+        }
+ 
+        // Touch input
+        if (Input.touchCount > 0 && !anyBallActive)
+        { 
+            Touch touch = Input.GetTouch(0);
+            PointerEventData eventDataCurrentPosition = new PointerEventData(EventSystem.current);
+            eventDataCurrentPosition.position = touch.position;
+            List<RaycastResult> results = new List<RaycastResult>();
+            EventSystem.current.RaycastAll(eventDataCurrentPosition, results);
+ 
+            if (results.Count > 0)
+            {
+                foreach (RaycastResult hit in results)
+                {
+                   if (hit.gameObject.CompareTag("MainCanvas"))
+                   {
+                        return; 
+                   }
+                }
+            }
+            else
+            {
+             HandleTouchInput(anyBallActive);
+                
+            }
+        }
+        else if (!Input.GetMouseButton(0))
+        {
+            line.enabled = false;
+        }
+ 
+        if (!isMoving && !anyBallActive)
+        {
+            HideBallBtn();
+        }
+    }
+ 
+    public void RayCheck()
+    {
+        bool anyBallActive = false;
+        foreach (GameObject ball in ObjectPool.Instance.pooledObjects)
+        {
+            if (ball.activeInHierarchy)
+            {
+                anyBallActive = true;
+                break;
+            }
+        }
+ 
+        if (!isMoving && sliderValue != 0 && !anyBallActive)
+        {
+            line.enabled = true;
+            ray = Physics2D.Raycast(transform.position, transform.up, 20f, layermask);
+            Vector2 reflectPos = Vector2.Reflect(ray.point - (Vector2)transform.position, ray.normal);
+ 
+            if (useRay)
+            {
+                Debug.DrawRay(transform.position, transform.up * ray.distance, Color.red);
+                Debug.DrawRay(ray.point, reflectPos.normalized * 2f, Color.green);
+            }
+ 
+            if (useLine)
+            {
+                line.positionCount = 3;
+                line.SetPosition(0, transform.position);
+                line.SetPosition(1, ray.point);
+                line.SetPosition(2, ray.point + reflectPos.normalized * 2f);
+            }
+        }
+        else
+        {
+            line.enabled = false;
+        }
+    }
+ 
+    private void HandleTouchInput(bool anyBallActive)
+    {
+        if (Input.touchCount > 0)
+        {
+            Touch touch = Input.GetTouch(0);
+            // PointerEventData eventDataCurrentPosition = new PointerEventData(EventSystem.current);
+            // eventDataCurrentPosition.position = touch.position;
+            // List<RaycastResult> results = new List<RaycastResult>();
+            // EventSystem.current.RaycastAll(eventDataCurrentPosition, results);
+            //
+            // if (results.Count > 0)
+            // {
+            //     Debug.Log("Raycast hit something on UI:");
+            //     foreach (RaycastResult hit in results)
+            //     {
+            //         Debug.Log($"  Hit GameObject: {hit.gameObject.name}, Tag: {hit.gameObject.tag}");
+            //         if (hit.gameObject.CompareTag("MainCanvas"))
+            //         {
+            //             Debug.Log("  Hit MainCanvas tag.");
+            //             return;
+            //         }
+            //     }
+            // }
+            Vector3 touchWorldPos = Camera.main.ScreenToWorldPoint(touch.position);
+            Vector2 direction = (Vector2)touchWorldPos - (Vector2)transform.position;
+            direction.Normalize();
+            angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
+ 
+            if (angle >= minMaxAngle.x && angle <= minMaxAngle.y)
+            {
+                transform.rotation = Quaternion.AngleAxis(angle, Vector3.forward);
+                ray = Physics2D.Raycast(transform.position, transform.up, 20f, layermask);
+                Vector2 reflectPos = Vector2.Reflect(ray.point - (Vector2)transform.position, ray.normal);
+ 
+                if (useLine)
+                {
+                    line.enabled = true;
+                    line.positionCount = 3;
+                    line.SetPosition(0, transform.position);
+                    line.SetPosition(1, ray.point);
+                    line.SetPosition(2, ray.point + reflectPos.normalized * 2f);
+                }
+ 
+                if (touch.phase == TouchPhase.Ended && !isMoving && !anyBallActive)
+                {
+                    StartCoroutine(Shootball());
+                    isMoving = true;
+                    canForceDownBall = false;
+                    rb.AddForce(transform.up * speed, ForceMode2D.Impulse);
+                }
+            }
+            else
+            {
+                line.enabled = false;
             }
         }
     }
-    else
+ 
+    #region Shooting Coroutine
+    IEnumerator Shootball()
     {
-        Debug.Log("Raycast did not hit any UI element.");
+        Vector2 shootPosition = transform.position;
+        Vector2 shootDirection = transform.up.normalized;
+        yield return new WaitForSeconds(0.1f);
+ 
+        for (int i = 0; i < _ballcount + ScoreScript.Instance.newBallCountforprefab; i++)
+        {
+            GameObject ball = ObjectPool.Instance.GetPooledObject();
+            if (ball != null)
+            {
+                ball.transform.position = shootPosition;
+                ball.SetActive(true);
+                ballClone.Add(ball);
+                Rigidbody2D ballRb = ball.GetComponent<Rigidbody2D>();
+                ballRb.velocity = Vector2.zero;
+                ballRb.AddForce(shootDirection * speed, ForceMode2D.Impulse);
+            }
+            yield return new WaitForSeconds(0.1f);
+        }
+        yield return StartCoroutine(ShowBtn());
     }
-
-    // Rest of your touch handling logic...
+ 
+    IEnumerator ShowBtn()
+    {
+        yield return new WaitForSeconds(0.1f);
+        BallDownBtnUI.SetActive(true);
+        yield return null;
+    }
+ 
+    public void HideBallBtn()
+    {
+        bool anyBallActive = false;
+        foreach (GameObject ball in ObjectPool.Instance.pooledObjects)
+        {
+            if (ball.activeInHierarchy)
+            {
+                anyBallActive = true;
+                break;
+            }
+        }
+ 
+        if (!anyBallActive && !isMoving)
+        {
+            BallDownBtnUI.SetActive(false);
+        }
+    }
+    #endregion
+ 
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (collision.gameObject.CompareTag("WallCollider"))
+        {
+            AudioMangerScript.Instance.PlayOneShot(AudioType.WALLHIT);
+        }
+ 
+        if (collision.gameObject.CompareTag("ground"))
+        {
+            newStartPos = transform.position;
+            rb.velocity = Vector2.zero;
+            slider.value = 0;
+            transform.position = new Vector2(newStartPos.x, -3.12f); //fixed
+            Debug.Log(transform.position);
+            isMoving = false;
+            canForceDownBall = true;
+            line.transform.position = transform.position;
+            foreach (var balls in ballClone)
+            {
+                presentBallCount++;
+            }
+            //ground error
+            // bool anyBallActive = false;
+            //
+            // foreach (GameObject ball in ObjectPool.Instance.pooledObjects)
+            // {
+            // if (ball.activeInHierarchy)
+            // {
+            // anyBallActive = true;
+            // break;
+            // }
+            // }
+            //
+            // if (!anyBallActive && !isMoving)
+            // {
+            // boxCollider.enabled = false;
+            // Debug.Log("Collision Disabled");
+            // }
+            // Debug.Log("Ball Count Present: " + presentBallCount);
+        }
+    }
+ 
+    private void OnTriggerEnter2D(Collider2D collision)
+    {
+        if (collision.gameObject.CompareTag("Multiplier"))
+        {
+            _ballcount++;
+            Debug.Log("Ball Count: " + _ballcount);
+        }
+    }
 }
-
-   Run your game and touch the UI button. Check the Console output. It should tell you if the raycast is hitting any UI elements and if it's correctly identifying the one with the "MainCanvas" tag.
- * Check Event System: Ensure you have an EventSystem GameObject in your scene. Unity usually creates one automatically when you add a UI element. There should be only one EventSystem in your scene.
- * UI Layer: Make sure your UI Canvas and its elements are on a UI Layer. The Physics2DRaycaster is designed to interact with objects on UI Layers. You can check the Layer of your Canvas in the Inspector.
- * Camera Settings: If you're using a specific Camera for your UI (in the Canvas's Render Mode settings), ensure the Physics2DRaycaster is attached to that Camera. If your Canvas is in "Screen Space - Overlay" mode, the Physics2DRaycaster should be on your main game Camera.
-Let me know the output of the Debug.Log statements when you touch the UI button. This will give us more information to diagnose the problem.
+here in Handletouch input as my touch pass through ui and even whenm i click btn it shoots ball so do which touch count will detect any touch in scxreen resulting in shoot ball evene though i touch ui button. So do one in handle touch convert it touch detetcion
+through mouse btn and also use ipointerhandler to prevent touch over ui.
