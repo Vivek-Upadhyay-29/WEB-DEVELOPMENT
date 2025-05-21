@@ -34,7 +34,6 @@ public class BallMovementScript : MonoBehaviour
     public Vector2 startPos;
     public Vector2 lastLandedPosition;
 
-    private bool hasForcedDown = false;
     public bool hasMovedBricks = false;
     public bool canPressBallDownBtn = true;
 
@@ -108,17 +107,7 @@ public class BallMovementScript : MonoBehaviour
 
     public void RayCheck()
     {
-        bool anyBallActive = false;
-        foreach (GameObject ball in ObjectPool.Instance.pooledObjects)
-        {
-            if (ball.activeInHierarchy)
-            {
-                anyBallActive = true;
-                break;
-            }
-        }
-
-        if (!isMoving && sliderValue != 0 && !anyBallActive)
+        if (!isMoving && sliderValue != 0)
         {
             line.enabled = true;
             ray = Physics2D.Raycast(transform.position, transform.up, 20f, layermask);
@@ -184,7 +173,6 @@ public class BallMovementScript : MonoBehaviour
         }
     }
 
-    #region Shooting Coroutine
     IEnumerator Shootball()
     {
         Vector2 shootPosition = transform.position;
@@ -232,7 +220,6 @@ public class BallMovementScript : MonoBehaviour
             BallDownBtnUI.SetActive(false);
         }
     }
-    #endregion
 
     public void CheckAllBallsStoppedAndMoveBricks(BrickSpawner brickSpawner)
     {
@@ -261,7 +248,6 @@ public class BallMovementScript : MonoBehaviour
             yield return new WaitForSeconds(0.05f);
         }
 
-        hasForcedDown = false;
         hasMovedBricks = false;
         canPressBallDownBtn = true;
         ballClone.Clear();
@@ -270,15 +256,13 @@ public class BallMovementScript : MonoBehaviour
     }
 }
 
-// balldownbtn
-
+            //Balldownbtn
+            using System.Collections;
 using UnityEngine;
-using UnityEngine.UI;
 
 public class BallDownBtnScript : MonoBehaviour
 {
     [SerializeField] private BallMovementScript ballMovementScript;
-    [SerializeField] private BrickSpawner brickSpawner;
     [SerializeField] private GameObject mainBall;
     [SerializeField] private Rigidbody2D gameball;
 
@@ -311,7 +295,7 @@ public class BallDownBtnScript : MonoBehaviour
         ballMovementScript.canForceDownBall = true;
         mainBall.transform.position = ballMovementScript.startPos;
 
-        brickSpawner.MoveDownAndAddNewRow();
+        // Brick move will now only happen in Ground.cs
     }
 
     private IEnumerator MoveToResetPos(Rigidbody2D rb1)
@@ -335,6 +319,7 @@ public class BallDownBtnScript : MonoBehaviour
 }
 
                     //ground
+
                     using System.Collections;
 using UnityEngine;
 
@@ -382,4 +367,3 @@ public class Ground : MonoBehaviour
         }
     }
 }
-            
