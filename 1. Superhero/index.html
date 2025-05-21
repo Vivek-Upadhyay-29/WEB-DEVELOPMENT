@@ -1,32 +1,264 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
+using Image = UnityEngine.UI.Image;
+
+public class BallDownBtnScript : MonoBehaviour
+{
+    [SerializeField] private BallMovementScript ballMovementScript;
+    [SerializeField] private BrickSpawner brickSpawner;
+    [SerializeField] private GameObject mainBall;
+    [SerializeField] private Rigidbody2D gameball;
+    [SerializeField] private Image balldownSprite;
+    [SerializeField] private Button btn;
+    
+    private void Start()
+    {
+        gameball = mainBall.GetComponent<Rigidbody2D>();
+
+    }
+
+
+
+    public void BallDown()
+    {
+        
+        
+        bool anyBallActive = false;
+
+        foreach (GameObject ball in ObjectPool.Instance.pooledObjects)
+        {
+            if (ball.activeInHierarchy)
+            {
+                anyBallActive = true;
+                break;
+            }
+        }
+        
+        if (ballMovementScript.isMoving || anyBallActive)
+        {
+            foreach (GameObject ball in ballMovementScript.ballClone)
+            {
+                if (ball != null && ball.activeInHierarchy)
+                {
+                    Rigidbody2D rb = ball.GetComponent<Rigidbody2D>();
+                     rb.velocity = Vector2.zero;
+                  //   balldownSprite.enabled = false;
+                     //btn.interactable = false;
+                     StartCoroutine(MoveToResetPos(rb));
+                }
+            }
+          
+            gameball.velocity = new Vector2(0f, -5f);         
+            gameball.velocity = Vector2.zero;               
+            
+            ballMovementScript.presentBallCount = 0;
+            ballMovementScript.isMoving = false;
+            ballMovementScript.slider.value = 0;
+            ballMovementScript.canForceDownBall = true;
+            mainBall.transform.position = ballMovementScript.startPos;
+            brickSpawner.MoveDownAndAddNewRow();
+        }
+
+        IEnumerator MoveToResetPos(Rigidbody2D rigidbody2D)
+    {
+        AudioMangerScript.Instance.PlayOneShot(AudioType.BALLDOWNBTN);
+       
+        Rigidbody2D rb1 = rigidbody2D;
+        Vector3 targetPosition = ScoreScript.Instance.resetPosition.position;
+        float speed = 5f;
+        rb1.velocity = Vector2.zero;
+        rb1.angularVelocity = 0f;
+        rb1.isKinematic = true;
+         
+        while (Vector3.Distance(rb1.transform.position, targetPosition) > 0.05f)
+        {
+            rb1.transform.position = Vector3.MoveTowards(rb1.position, targetPosition, speed * Time.deltaTime);
+            yield return null;
+        }
+  
+        rb1.transform.position = targetPosition;
+        rb1.isKinematic = false;
+       // balldownSprite.enabled = true;
+       // btn.interactable = true;
+        rb1.gameObject.SetActive(false);
+        
+     
+      }
+    }
+   
+ 
+}
+
+                        this balldown btn script.
+below is ground script
+//using System.Collections;
+//using System.Collections.Generic;
+//using Unity.VisualScripting;
+//using UnityEngine;
+
+
+//public class Ground : MonoBehaviour
+//{
+
+//    private Rigidbody2D rb;
+
+//    [SerializeField] private  BallMovementScript ballMovement;
+//    [SerializeField] private  BrickSpawner brickSpawner;
+//    [SerializeField] private Vector3 newBallPosition;
+
+//    private void OnCollisionEnter2D(Collision2D collision)
+//    {
+
+//        if (collision.gameObject.tag == "cloneBall")
+//        {
+
+
+//            rb = collision.gameObject.GetComponent<Rigidbody2D>();
+//            StartCoroutine(MoveToResetPos(rb));
+//            // newBallPosition  = rb.transform.position ;
+//        }
+
+//    } 
+//    private IEnumerator MoveToResetPos(Rigidbody2D rigidbody2D)
+//    {
+//        Rigidbody2D rb1 = rigidbody2D;
+//    //    Vector3 targetPosition = ScoreScript.Instance.resetPosition.position;
+//       Vector3 targetPosition = new Vector3(ballMovement.transform.position.x , -3.12f);
+//        float speed = 5f;
+//        rb1.velocity = Vector2.zero;
+//        rb1.angularVelocity = 0f;
+//        rb1.isKinematic = true;
+
+//        while (Vector3.Distance(rb1.transform.position, targetPosition) > 0.05f)
+//        {
+//            rb1.transform.position = Vector3.MoveTowards(rb1.position, targetPosition, speed * Time.deltaTime);
+//            yield return null;
+//        }
+
+//        rb1.transform.position = targetPosition;
+//        rb1.isKinematic = false;
+//        rb1.gameObject.SetActive(false);
+
+//        bool anyBallActive = false;
+
+//        foreach (GameObject ball in ObjectPool.Instance.pooledObjects)
+//        {
+//            if (ball.activeInHierarchy)
+//            {
+//                anyBallActive = true;
+//                break;
+//            }
+//        }
+//        if (!anyBallActive && !ballMovement.isMoving)
+//        {
+
+//            ballMovement.ballClone.Clear();
+//            ballMovement.presentBallCount = 0;
+//            brickSpawner.MoveDownAndAddNewRow();
+//        }
+//    }
+//}
+
+
+
+
+//private IEnumerator MoveToResetPos(Rigidbody2D rb1)
+//{
+//    Vector3 targetPosition = new Vector3(ballMovement.transform.position.x, -3.12f);
+//    float speed = 5f;
+
+//    rb1.velocity = Vector2.zero;
+//    rb1.angularVelocity = 0f;
+//    rb1.isKinematic = true;
+
+//    while (Vector3.Distance(rb1.transform.position, targetPosition) > 0.05f)
+//    {
+//        rb1.transform.position = Vector3.MoveTowards(rb1.position, targetPosition, speed * Time.deltaTime);
+//        yield return null;
+//    }
+
+//    rb1.transform.position = targetPosition;
+//    rb1.isKinematic = false;
+//    rb1.gameObject.SetActive(false);
+//   yield return new WaitForEndOfFrame();
+//  ballMovement.CheckAllBallsStoppedAndMoveBricks(brickSpawner);
+//}
+
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class Ground : MonoBehaviour
+{
+    private Rigidbody2D rb;
+
+    [SerializeField] private BallMovementScript ballMovement;
+    [SerializeField] private BrickSpawner brickSpawner;
+
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (collision.gameObject.CompareTag("cloneBall"))
+        {
+            rb = collision.gameObject.GetComponent<Rigidbody2D>();
+            StartCoroutine(MoveToResetPos(rb));
+        }
+    }
+  private IEnumerator MoveToResetPos(Rigidbody2D rb1)
+    {
+        Vector3 targetPosition = new Vector3(ballMovement.transform.position.x, -3.12f);
+        float speed = 5f;
+
+        rb1.velocity = Vector2.zero;
+        rb1.angularVelocity = 0f;
+        rb1.isKinematic = true;
+
+        while (Vector3.Distance(rb1.transform.position, targetPosition) > 0.05f)
+        {
+            rb1.transform.position = Vector3.MoveTowards(rb1.position, targetPosition, speed * Time.deltaTime);
+            yield return null;
+        }
+
+        rb1.transform.position = targetPosition;
+        rb1.isKinematic = false;
+        rb1.gameObject.SetActive(false);
+
+        yield return null;
+
+        ballMovement.CheckAllBallsStoppedAndMoveBricks(brickSpawner);
+    }
+
+}
+
+
+and this mainballmovement script
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
-
+ 
 public class BallMovementScript : MonoBehaviour
 {
     [SerializeField] private Rigidbody2D rb;
-    [SerializeField] private float speed = 1f;
-    [SerializeField] private bool isIdle;
-    [SerializeField] private Vector2 newStartPos;
-    [SerializeField] private Vector2 endPos;
+    [SerializeField] private float speed = 1;
     [SerializeField] private GameObject BallDownBtnUI;
     public float sliderValue;
     public Slider slider;
     public bool isMoving;
-
+ 
     [Header("Raycast")]
     [SerializeField] private LayerMask layermask;
     [SerializeField] private RaycastHit2D ray;
     [SerializeField] private float angle;
     [SerializeField] private Vector2 minMaxAngle;
-
+ 
     [Header("LineRenderer")]
     [SerializeField] private LineRenderer line;
     [SerializeField] private bool useRay = true;
     [SerializeField] private bool useLine = true;
-
+ 
     [Header("Ball Prefab")]
     [SerializeField] private SpriteRenderer sprite;
     public List<GameObject> ballClone;
@@ -35,111 +267,102 @@ public class BallMovementScript : MonoBehaviour
     public int presentBallCount;
     public bool canForceDownBall = true;
     public Vector2 startPos;
-
+    public Vector2 lastLandedPosition;
+ 
+    private bool hasForcedDown = false;
+ 
     void Start()
     {
+        Time.timeScale = 0;
         Application.targetFrameRate = 120;
         Screen.orientation = ScreenOrientation.Portrait;
+ 
         line = GetComponent<LineRenderer>();
         sprite = GetComponent<SpriteRenderer>();
         rb = GetComponent<Rigidbody2D>();
         startPos = transform.position;
         line.enabled = false;
         _isCloned = false;
-
+ 
         AudioMangerScript.Instance.BackgroundMusic(AudioType.BACKGROUND);
     }
-
+ 
     void Update()
     {
-        bool anyBallActive = AnyBallIsActive();
-
+        bool anyBallActive = false;
+        foreach (GameObject ball in ObjectPool.Instance.pooledObjects)
+        {
+            if (ball.activeInHierarchy)
+            {
+                anyBallActive = true;
+                break;
+            }
+        }
+ 
         sliderValue = slider.value;
         transform.rotation = Quaternion.Euler(0, 0, -sliderValue * 80);
-
-        // Mouse input
-        if (Input.GetMouseButton(0) && !IsPointerOverUI())
+ 
+        if (Input.GetMouseButton(0))
         {
             RayCheck();
         }
-
-        if (Input.GetMouseButtonUp(0) && !isMoving && sliderValue != 0 && !anyBallActive && !IsPointerOverUI())
+ 
+        if (Input.GetMouseButtonUp(0) && !isMoving && sliderValue != 0 && !anyBallActive)
         {
             StartCoroutine(Shootball());
             isMoving = true;
             canForceDownBall = false;
             rb.AddForce(transform.up * speed, ForceMode2D.Impulse);
         }
-
-        // Touch input
+ 
         if (Input.touchCount > 0 && !anyBallActive)
         {
             Touch touch = Input.GetTouch(0);
-
-            if (!IsPointerOverUI(touch))
+            PointerEventData eventDataCurrentPosition = new PointerEventData(EventSystem.current);
+            eventDataCurrentPosition.position = touch.position;
+            List<RaycastResult> results = new List<RaycastResult>();
+            EventSystem.current.RaycastAll(eventDataCurrentPosition, results);
+ 
+            if (results.Count == 0)
             {
-                if (touch.phase == TouchPhase.Moved)
-                {
-                    HandleTouchRotation(touch);
-                }
-
-                if (touch.phase == TouchPhase.Ended && !isMoving && sliderValue != 0)
-                {
-                    StartCoroutine(Shootball());
-                    isMoving = true;
-                    canForceDownBall = false;
-                    rb.AddForce(transform.up * speed, ForceMode2D.Impulse);
-                }
+                HandleTouchInput(anyBallActive);
             }
         }
         else if (!Input.GetMouseButton(0))
         {
             line.enabled = false;
         }
-
+ 
         if (!isMoving && !anyBallActive)
         {
             HideBallBtn();
         }
     }
-
-    bool AnyBallIsActive()
+ 
+    public void RayCheck()
     {
+        bool anyBallActive = false;
         foreach (GameObject ball in ObjectPool.Instance.pooledObjects)
         {
-            if (ball.activeInHierarchy) return true;
+            if (ball.activeInHierarchy)
+            {
+                anyBallActive = true;
+                break;
+            }
         }
-        return false;
-    }
-
-    bool IsPointerOverUI()
-    {
-        return EventSystem.current.IsPointerOverGameObject();
-    }
-
-    bool IsPointerOverUI(Touch touch)
-    {
-        PointerEventData eventData = new PointerEventData(EventSystem.current);
-        eventData.position = touch.position;
-        List<RaycastResult> results = new List<RaycastResult>();
-        EventSystem.current.RaycastAll(eventData, results);
-        return results.Count > 0;
-    }
-
-    void RayCheck()
-    {
-        if (!isMoving && sliderValue != 0 && !AnyBallIsActive())
+ 
+        if (!isMoving && sliderValue != 0 && !anyBallActive)
         {
             line.enabled = true;
             ray = Physics2D.Raycast(transform.position, transform.up, 20f, layermask);
             Vector2 reflectPos = Vector2.Reflect(ray.point - (Vector2)transform.position, ray.normal);
-
+ 
             if (useRay)
             {
                 Debug.DrawRay(transform.position, transform.up * ray.distance, Color.red);
                 Debug.DrawRay(ray.point, reflectPos.normalized * 2f, Color.green);
             }
-
+ 
             if (useLine)
             {
                 line.positionCount = 3;
@@ -153,31 +376,54 @@ public class BallMovementScript : MonoBehaviour
             line.enabled = false;
         }
     }
-
-    void HandleTouchRotation(Touch touch)
+ 
+    private void HandleTouchInput(bool anyBallActive)
     {
-        Vector3 touchWorldPos = Camera.main.ScreenToWorldPoint(touch.position);
-        Vector2 direction = (Vector2)touchWorldPos - (Vector2)transform.position;
-        direction.Normalize();
-        angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
-
-        if (angle >= minMaxAngle.x && angle <= minMaxAngle.y)
+        if (Input.touchCount > 0)
         {
-            transform.rotation = Quaternion.AngleAxis(angle, Vector3.forward);
-            RayCheck();
-        }
-        else
-        {
-            line.enabled = false;
+            Touch touch = Input.GetTouch(0);
+            Vector3 touchWorldPos = Camera.main.ScreenToWorldPoint(touch.position);
+            Vector2 direction = (Vector2)touchWorldPos - (Vector2)transform.position;
+            direction.Normalize();
+            angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
+ 
+            if (angle >= minMaxAngle.x && angle <= minMaxAngle.y)
+            {
+                transform.rotation = Quaternion.AngleAxis(angle, Vector3.forward);
+                ray = Physics2D.Raycast(transform.position, transform.up, 20f, layermask);
+                Vector2 reflectPos = Vector2.Reflect(ray.point - (Vector2)transform.position, ray.normal);
+ 
+                if (useLine)
+                {
+                    line.enabled = true;
+                    line.positionCount = 3;
+                    line.SetPosition(0, transform.position);
+                    line.SetPosition(1, ray.point);
+                    line.SetPosition(2, ray.point + reflectPos.normalized * 2f);
+                }
+ 
+                if (touch.phase == TouchPhase.Ended && !isMoving && !anyBallActive)
+                {
+                    StartCoroutine(Shootball());
+                    isMoving = true;
+                    canForceDownBall = false;
+                    rb.AddForce(transform.up * speed, ForceMode2D.Impulse);
+                }
+            }
+            else
+            {
+                line.enabled = false;
+            }
         }
     }
-
+ 
+    #region Shooting Coroutine
     IEnumerator Shootball()
     {
         Vector2 shootPosition = transform.position;
         Vector2 shootDirection = transform.up.normalized;
         yield return new WaitForSeconds(0.1f);
-
+ 
         for (int i = 0; i < _ballcount + ScoreScript.Instance.newBallCountforprefab; i++)
         {
             GameObject ball = ObjectPool.Instance.GetPooledObject();
@@ -192,48 +438,92 @@ public class BallMovementScript : MonoBehaviour
             }
             yield return new WaitForSeconds(0.1f);
         }
-
+ 
         yield return StartCoroutine(ShowBtn());
     }
-
+ 
     IEnumerator ShowBtn()
     {
         yield return new WaitForSeconds(0.1f);
         BallDownBtnUI.SetActive(true);
     }
-
+ 
     public void HideBallBtn()
     {
-        if (!AnyBallIsActive() && !isMoving)
+        bool anyBallActive = false;
+        foreach (GameObject ball in ObjectPool.Instance.pooledObjects)
+        {
+            if (ball.activeInHierarchy)
+            {
+                anyBallActive = true;
+                break;
+            }
+        }
+ 
+        if (!anyBallActive && !isMoving)
         {
             BallDownBtnUI.SetActive(false);
         }
     }
-
+    #endregion
+ 
+    public void ForceAllBallsDown()
+    {
+        if (hasForcedDown) return;
+        hasForcedDown = true;
+ 
+        foreach (GameObject ball in ObjectPool.Instance.pooledObjects)
+        {
+            if (ball.activeInHierarchy)
+            {
+                Rigidbody2D rb = ball.GetComponent<Rigidbody2D>();
+                StartCoroutine(ForceToGround(rb));
+            }
+        }
+    }
+ 
+    private IEnumerator ForceToGround(Rigidbody2D ballRb)
+    {
+        Vector3 target = new Vector3(ballRb.transform.position.x, -3.12f);
+        float speed = 10f;
+        ballRb.velocity = Vector2.zero;
+        ballRb.isKinematic = true;
+ 
+        while (Vector3.Distance(ballRb.transform.position, target) > 0.05f)
+        {
+            ballRb.transform.position = Vector3.MoveTowards(ballRb.transform.position, target, speed * Time.deltaTime);
+            yield return null;
+        }
+ 
+        ballRb.transform.position = target;
+        ballRb.isKinematic = false;
+        ballRb.gameObject.SetActive(false);
+    }
+ 
     private void OnCollisionEnter2D(Collision2D collision)
     {
         if (collision.gameObject.CompareTag("WallCollider"))
         {
             AudioMangerScript.Instance.PlayOneShot(AudioType.WALLHIT);
         }
-
+ 
         if (collision.gameObject.CompareTag("ground"))
         {
-            newStartPos = transform.position;
+            lastLandedPosition = new Vector2(transform.position.x, -3.12f);
             rb.velocity = Vector2.zero;
             slider.value = 0;
-            transform.position = new Vector2(newStartPos.x, -3.12f);
+            transform.position = lastLandedPosition;
             isMoving = false;
             canForceDownBall = true;
             line.transform.position = transform.position;
-
-            foreach (var balls in ballClone)
+ 
+            foreach (var ball in ballClone)
             {
                 presentBallCount++;
             }
         }
     }
-
+ 
     private void OnTriggerEnter2D(Collider2D collision)
     {
         if (collision.gameObject.CompareTag("Multiplier"))
@@ -242,4 +532,42 @@ public class BallMovementScript : MonoBehaviour
             Debug.Log("Ball Count: " + _ballcount);
         }
     }
+ 
+    public void CheckAllBallsStoppedAndMoveBricks(BrickSpawner brickSpawner)
+    {
+        StartCoroutine(WaitUntilAllBallsDown(brickSpawner));
+    }
+ 
+    private IEnumerator WaitUntilAllBallsDown(BrickSpawner brickSpawner)
+    {
+        yield return new WaitForSeconds(0.1f);
+ 
+        while (true)
+        {
+            bool anyBallActive = false;
+            foreach (GameObject ball in ObjectPool.Instance.pooledObjects)
+            {
+                if (ball.activeInHierarchy)
+                {
+                    anyBallActive = true;
+                    break;
+                }
+            }
+ 
+            if (!anyBallActive && !isMoving)
+                break;
+ 
+            yield return new WaitForSeconds(0.05f);
+        }
+ 
+        hasForcedDown = false;
+        ballClone.Clear();
+        presentBallCount = 0;
+        brickSpawner.MoveDownAndAddNewRow();
+    }
 }
+the problem is first ball down btn is can be pressesd twice i want it can be pressed onces per use until we start shooting again. The the when balldown btn is presses brickSpawner.MoveDownAndAddNewRow(); is actived and as its in main ball movemnt script and the gfround scropt om,etime 
+bricks are coming dow twice maybe duw to both ground and ball down btn has thta brickSpawner.MoveDownAndAddNewRow(); so fix this al;so
+
+
+
