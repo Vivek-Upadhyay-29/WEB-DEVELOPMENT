@@ -1,369 +1,160 @@
-using System.Collections;
+Here's everything you need for full power-up saving and loading:
+
+
+---
+
+✅ 1. SaveData.cs (Full Updated Script)
+
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.EventSystems;
-using UnityEngine.UI;
+using System.IO;
 
-public class BallMovementScript : MonoBehaviour
+[System.Serializable]
+public class BrickData
 {
-    [SerializeField] private Rigidbody2D rb;
-    [SerializeField] private float speed = 1;
-    [SerializeField] private GameObject BallDownBtnUI;
-    public float sliderValue;
-    public Slider slider;
-    public bool isMoving;
+    public Vector3 position;
+    public int brickValue;
+}
 
-    [Header("Raycast")]
-    [SerializeField] private LayerMask layermask;
-    [SerializeField] private RaycastHit2D ray;
-    [SerializeField] private float angle;
-    [SerializeField] private Vector2 minMaxAngle;
+[System.Serializable]
+public class PowerUpData
+{
+    public Vector3 position;
+    public string type;
+}
 
-    [Header("LineRenderer")]
-    [SerializeField] private LineRenderer line;
-    [SerializeField] private bool useRay = true;
-    [SerializeField] private bool useLine = true;
+[System.Serializable]
+public class SaveDataItem
+{
+    public int Highscore;
+    public int CurrentScore;
+    public int BonusBallCount;
+    public List<BrickData> bricks = new List<BrickData>();
+    public List<PowerUpData> powerUps = new List<PowerUpData>();
+}
 
-    [Header("Ball Prefab")]
-    [SerializeField] private SpriteRenderer sprite;
-    public List<GameObject> ballClone;
-    public bool _isCloned;
-    public int _ballcount = 1;
-    public int presentBallCount;
-    public bool canForceDownBall = true;
-    public Vector2 startPos;
-    public Vector2 lastLandedPosition;
+public class SaveData : MonoBehaviour
+{
+    public static SaveData instance;
 
-    public bool hasMovedBricks = false;
-    public bool canPressBallDownBtn = true;
+    private string saveFilePath;
 
-    void Start()
+    private void Awake()
     {
-        Time.timeScale = 0;
-        Application.targetFrameRate = 120;
-        Screen.orientation = ScreenOrientation.Portrait;
-
-        line = GetComponent<LineRenderer>();
-        sprite = GetComponent<SpriteRenderer>();
-        rb = GetComponent<Rigidbody2D>();
-        startPos = transform.position;
-        line.enabled = false;
-        _isCloned = false;
-
-        AudioMangerScript.Instance.BackgroundMusic(AudioType.BACKGROUND);
-    }
-
-    void Update()
-    {
-        bool anyBallActive = false;
-        foreach (GameObject ball in ObjectPool.Instance.pooledObjects)
+        if (instance == null)
         {
-            if (ball.activeInHierarchy)
-            {
-                anyBallActive = true;
-                break;
-            }
-        }
-
-        sliderValue = slider.value;
-        transform.rotation = Quaternion.Euler(0, 0, -sliderValue * 80);
-
-        if (Input.GetMouseButton(0))
-        {
-            RayCheck();
-        }
-
-        if (Input.GetMouseButtonUp(0) && !isMoving && sliderValue != 0 && !anyBallActive)
-        {
-            StartCoroutine(Shootball());
-            isMoving = true;
-            canForceDownBall = false;
-            rb.AddForce(transform.up * speed, ForceMode2D.Impulse);
-        }
-
-        if (Input.touchCount > 0 && !anyBallActive)
-        {
-            Touch touch = Input.GetTouch(0);
-            PointerEventData eventDataCurrentPosition = new PointerEventData(EventSystem.current);
-            eventDataCurrentPosition.position = touch.position;
-            List<RaycastResult> results = new List<RaycastResult>();
-            EventSystem.current.RaycastAll(eventDataCurrentPosition, results);
-
-            if (results.Count == 0)
-            {
-                HandleTouchInput(anyBallActive);
-            }
-        }
-        else if (!Input.GetMouseButton(0))
-        {
-            line.enabled = false;
-        }
-
-        if (!isMoving && !anyBallActive)
-        {
-            HideBallBtn();
-        }
-    }
-
-    public void RayCheck()
-    {
-        if (!isMoving && sliderValue != 0)
-        {
-            line.enabled = true;
-            ray = Physics2D.Raycast(transform.position, transform.up, 20f, layermask);
-            Vector2 reflectPos = Vector2.Reflect(ray.point - (Vector2)transform.position, ray.normal);
-
-            if (useRay)
-            {
-                Debug.DrawRay(transform.position, transform.up * ray.distance, Color.red);
-                Debug.DrawRay(ray.point, reflectPos.normalized * 2f, Color.green);
-            }
-
-            if (useLine)
-            {
-                line.positionCount = 3;
-                line.SetPosition(0, transform.position);
-                line.SetPosition(1, ray.point);
-                line.SetPosition(2, ray.point + reflectPos.normalized * 2f);
-            }
+            instance = this;
+            saveFilePath = Application.persistentDataPath + "/saveBrickData.json";
         }
         else
         {
-            line.enabled = false;
+            Destroy(gameObject);
         }
     }
 
-    private void HandleTouchInput(bool anyBallActive)
+    public void SaveToJson(int highScore, List<GameObject> spawnedBricks)
     {
-        if (Input.touchCount > 0)
+        SaveDataItem data = new SaveDataItem();
+        data.Highscore = highScore;
+        data.CurrentScore = ScoreScript.Instance.GetCurrentScore();
+        data.BonusBallCount = ScoreScript.Instance.newBallCountforprefab;
+
+        foreach (GameObject obj in spawnedBricks)
         {
-            Touch touch = Input.GetTouch(0);
-            Vector3 touchWorldPos = Camera.main.ScreenToWorldPoint(touch.position);
-            Vector2 direction = (Vector2)touchWorldPos - (Vector2)transform.position;
-            direction.Normalize();
-            angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
+            if (obj == null || !obj.activeInHierarchy) continue;
 
-            if (angle >= minMaxAngle.x && angle <= minMaxAngle.y)
+            if (obj.CompareTag("Brick"))
             {
-                transform.rotation = Quaternion.AngleAxis(angle, Vector3.forward);
-                ray = Physics2D.Raycast(transform.position, transform.up, 20f, layermask);
-                Vector2 reflectPos = Vector2.Reflect(ray.point - (Vector2)transform.position, ray.normal);
-
-                if (useLine)
+                BrickData brickData = new BrickData
                 {
-                    line.enabled = true;
-                    line.positionCount = 3;
-                    line.SetPosition(0, transform.position);
-                    line.SetPosition(1, ray.point);
-                    line.SetPosition(2, ray.point + reflectPos.normalized * 2f);
-                }
-
-                if (touch.phase == TouchPhase.Ended && !isMoving && !anyBallActive)
+                    position = obj.transform.position,
+                    brickValue = obj.GetComponent<Brick>().GetValue()
+                };
+                data.bricks.Add(brickData);
+            }
+            else if (obj.CompareTag("PowerUp"))
+            {
+                PowerUpData powerUpData = new PowerUpData
                 {
-                    StartCoroutine(Shootball());
-                    isMoving = true;
-                    canForceDownBall = false;
-                    rb.AddForce(transform.up * speed, ForceMode2D.Impulse);
-                }
-            }
-            else
-            {
-                line.enabled = false;
+                    position = obj.transform.position,
+                    type = obj.name.Replace("(Clone)", "")
+                };
+                data.powerUps.Add(powerUpData);
             }
         }
+
+        string json = JsonUtility.ToJson(data);
+        File.WriteAllText(saveFilePath, json);
+        Debug.Log("Game Saved at " + saveFilePath);
     }
 
-    IEnumerator Shootball()
+    public SaveDataItem LoadFromJson()
     {
-        Vector2 shootPosition = transform.position;
-        Vector2 shootDirection = transform.up.normalized;
-        yield return new WaitForSeconds(0.1f);
-
-        for (int i = 0; i < _ballcount + ScoreScript.Instance.newBallCountforprefab; i++)
+        if (File.Exists(saveFilePath))
         {
-            GameObject ball = ObjectPool.Instance.GetPooledObject();
-            if (ball != null)
-            {
-                ball.transform.position = shootPosition;
-                ball.SetActive(true);
-                ballClone.Add(ball);
-                Rigidbody2D ballRb = ball.GetComponent<Rigidbody2D>();
-                ballRb.velocity = Vector2.zero;
-                ballRb.AddForce(shootDirection * speed, ForceMode2D.Impulse);
-            }
-            yield return new WaitForSeconds(0.1f);
+            string json = File.ReadAllText(saveFilePath);
+            return JsonUtility.FromJson<SaveDataItem>(json);
         }
-
-        yield return StartCoroutine(ShowBtn());
-    }
-
-    IEnumerator ShowBtn()
-    {
-        yield return new WaitForSeconds(0.1f);
-        BallDownBtnUI.SetActive(true);
-    }
-
-    public void HideBallBtn()
-    {
-        bool anyBallActive = false;
-        foreach (GameObject ball in ObjectPool.Instance.pooledObjects)
-        {
-            if (ball.activeInHierarchy)
-            {
-                anyBallActive = true;
-                break;
-            }
-        }
-
-        if (!anyBallActive && !isMoving)
-        {
-            BallDownBtnUI.SetActive(false);
-        }
-    }
-
-    public void CheckAllBallsStoppedAndMoveBricks(BrickSpawner brickSpawner)
-    {
-        StartCoroutine(WaitUntilAllBallsDown(brickSpawner));
-    }
-
-    private IEnumerator WaitUntilAllBallsDown(BrickSpawner brickSpawner)
-    {
-        yield return new WaitForSeconds(0.1f);
-
-        while (true)
-        {
-            bool anyBallActive = false;
-            foreach (GameObject ball in ObjectPool.Instance.pooledObjects)
-            {
-                if (ball.activeInHierarchy)
-                {
-                    anyBallActive = true;
-                    break;
-                }
-            }
-
-            if (!anyBallActive && !isMoving)
-                break;
-
-            yield return new WaitForSeconds(0.05f);
-        }
-
-        hasMovedBricks = false;
-        canPressBallDownBtn = true;
-        ballClone.Clear();
-        presentBallCount = 0;
-        brickSpawner.MoveDownAndAddNewRow();
+        return new SaveDataItem();
     }
 }
 
-            //Balldownbtn
-            using System.Collections;
-using UnityEngine;
 
-public class BallDownBtnScript : MonoBehaviour
+---
+
+✅ 2. Modify BrickSpawner.cs → LoadBricksFromSave()
+
+Update your LoadBricksFromSave() like this:
+
+public void LoadBricksFromSave()
 {
-    [SerializeField] private BallMovementScript ballMovementScript;
-    [SerializeField] private GameObject mainBall;
-    [SerializeField] private Rigidbody2D gameball;
+    SaveDataItem data = SaveData.instance.LoadFromJson();
 
-    private void Start()
+    ScoreScript.Instance.SaveHighScore(data.Highscore);
+    ScoreScript.Instance.SetScore(data.CurrentScore);
+    ScoreScript.Instance.newBallCountforprefab = data.BonusBallCount;
+
+    foreach (var obj in spawnedBricks)
     {
-        gameball = mainBall.GetComponent<Rigidbody2D>();
+        if (obj != null)
+            Destroy(obj);
+    }
+    spawnedBricks.Clear();
+
+    foreach (var brickData in data.bricks)
+    {
+        GameObject brick = Instantiate(brickPrefab, brickData.position, Quaternion.identity);
+        Brick brickComponent = brick.GetComponent<Brick>();
+        if (brickComponent != null)
+        {
+            brickComponent.SetValue(brickData.brickValue);
+        }
+        spawnedBricks.Add(brick);
     }
 
-    public void BallDown()
+    foreach (var powerUpData in data.powerUps)
     {
-        if (!ballMovementScript.canPressBallDownBtn || ballMovementScript.hasMovedBricks) return;
-
-        ballMovementScript.canPressBallDownBtn = false;
-        ballMovementScript.hasMovedBricks = true;
-
-        foreach (GameObject ball in ballMovementScript.ballClone)
-        {
-            if (ball != null && ball.activeInHierarchy)
-            {
-                Rigidbody2D rb = ball.GetComponent<Rigidbody2D>();
-                rb.velocity = Vector2.zero;
-                StartCoroutine(MoveToResetPos(rb));
-            }
-        }
-
-        gameball.velocity = Vector2.zero;
-        ballMovementScript.presentBallCount = 0;
-        ballMovementScript.isMoving = false;
-        ballMovementScript.slider.value = 0;
-        ballMovementScript.canForceDownBall = true;
-        mainBall.transform.position = ballMovementScript.startPos;
-
-        // Brick move will now only happen in Ground.cs
-    }
-
-    private IEnumerator MoveToResetPos(Rigidbody2D rb1)
-    {
-        Vector3 targetPosition = ScoreScript.Instance.resetPosition.position;
-        float speed = 5f;
-        rb1.velocity = Vector2.zero;
-        rb1.angularVelocity = 0f;
-        rb1.isKinematic = true;
-
-        while (Vector3.Distance(rb1.transform.position, targetPosition) > 0.05f)
-        {
-            rb1.transform.position = Vector3.MoveTowards(rb1.position, targetPosition, speed * Time.deltaTime);
-            yield return null;
-        }
-
-        rb1.transform.position = targetPosition;
-        rb1.isKinematic = false;
-        rb1.gameObject.SetActive(false);
+        GameObject powerUp = BrickPool.Instance.GetPooledPowerUp(); // Or select prefab by type
+        powerUp.transform.position = powerUpData.position;
+        powerUp.SetActive(true);
+        spawnedBricks.Add(powerUp);
     }
 }
 
-                    //ground
+> If you have different types of power-ups, replace this line:
 
-                    using System.Collections;
-using UnityEngine;
 
-public class Ground : MonoBehaviour
-{
-    [SerializeField] private BallMovementScript ballMovement;
-    [SerializeField] private BrickSpawner brickSpawner;
 
-    private void OnCollisionEnter2D(Collision2D collision)
-    {
-        if (collision.gameObject.CompareTag("cloneBall"))
-        {
-            Rigidbody2D rb = collision.gameObject.GetComponent<Rigidbody2D>();
-            StartCoroutine(MoveToResetPos(rb));
-        }
-    }
+GameObject powerUp = BrickPool.Instance.GetPooledPowerUp();
 
-    private IEnumerator MoveToResetPos(Rigidbody2D rb1)
-    {
-        Vector3 targetPosition = new Vector3(ballMovement.transform.position.x, -3.12f);
-        float speed = 5f;
+With a method like:
 
-        rb1.velocity = Vector2.zero;
-        rb1.angularVelocity = 0f;
-        rb1.isKinematic = true;
+GameObject powerUp = PowerUpFactory.GetPowerUp(powerUpData.type);
 
-        while (Vector3.Distance(rb1.transform.position, targetPosition) > 0.05f)
-        {
-            rb1.transform.position = Vector3.MoveTowards(rb1.position, targetPosition, speed * Time.deltaTime);
-            yield return null;
-        }
+And create a factory method that returns the correct prefab/pool based on the type.
 
-        rb1.transform.position = targetPosition;
-        rb1.isKinematic = false;
-        rb1.gameObject.SetActive(false);
+Power-ups have the tag "PowerUp"
 
-        yield return null;
+Bricks have the tag "Brick"
 
-        if (!ballMovement.hasMovedBricks)
-        {
-            ballMovement.hasMovedBricks = true;
-            ballMovement.ballClone.Clear();
-            ballMovement.presentBallCount = 0;
-            brickSpawner.MoveDownAndAddNewRow();
-        }
-    }
-}
+You’re using the same spawnedBricks list to hold both (for saving)
